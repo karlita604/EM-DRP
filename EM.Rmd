@@ -1,0 +1,174 @@
+---
+title: "Directed Reading Program "
+author: Karla González 260715039
+supervisor: Annik Gougeon
+output: html_notebook
+---
+```{r}
+library(mixtools)
+library(mvtnorm)
+library(tidyverse)
+
+#true parameters
+
+k <- 2 #number of populations
+true_prob <- c(0.1, 0.5, 0.4)
+true_mu <- c(-2,3,10)
+true_var <- c(1,2,4)
+
+mixture_model_density <- function(x){
+  a <- 0.3
+  a * dmvnorm(x = x, mean = c(3, 2, 4)) + (1 - a) * dmvnorm(x = x, mean = c(2.5,5.5, 2.5))
+}
+
+print(mixture_model_density(c(1,2,3)))
+
+
+#execute the simulations
+    # for (i in 1:R){
+    #   components <- sample(1:k,prob=true_prop,size=N,replace=TRUE)
+    #   mean <- true_mu
+    #   sd <- sqrt(true_var)
+    #   f <- c(rnorm(n=N,mean=mean[components],sd=sd[components]))
+    #   store_sim[,i] <- f
+    # }
+```
+
+
+```{r}
+# EM algorithm manually
+# dat is the data
+
+#load("datem.Rdata")
+# read.csv(ipums.csv)
+# x <- ipums
+
+# initial values
+theta<-0.25
+theta_c<-1-theta
+mu1<--0.01
+mu2<-0.01
+sigma1<-sqrt(0.01)
+sigma2<-sqrt(0.02)
+ 
+loglik<- rep(NA, 1000)
+loglik[1]<-0
+loglik[2]<-sum(theta*(log(theta)+log(dnorm(x,mu1,sigma1))))+sum(theta_c*(log(theta_c)+log(dnorm(x,mu2,sigma2))))
+
+sum <- function(x) {
+  sum(x[is.finite(x)])
+}
+logdnorm <- function(x, mu, sigma) {
+  sum(sapply(x, function(x) {logdmvnorm(x, mu, sigma)}))  
+}
+alpha1<-0
+alpha2<-0
+
+k<-1
+
+s1 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s2 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s3 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s4 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s5 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s6 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s7 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s8 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s9 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+s10 = sample(x, size = 200 , replace = TRUE, prob = NULL)
+
+#print(s1)
+
+```
+
+
+```{r}
+# loop
+#while loop needs t/f value
+#try the repeat
+k <-c()
+while(abs(loglik[k+1]-loglik[k]) > 0.00001) {
+  # E step
+  
+  #Should be a vector of size N=200
+  #MATRIX FORM alpha
+  alpha1<-theta*dnorm(x,mean=mu1,sd=sigma1)/(theta*dnorm(x,mean=mu1,sd=sigma1)+theta_c*dnorm(x,mean=mu2,sd=sigma2))
+  
+  alpha2<-theta_c*dnorm(x,mean=mu2,sd=sigma2)/(theta*dnorm(x,mean=mu1,sd=sigma1)+theta_c*dnorm(x,mean=mu2,sd=sigma2))
+  # alpha1[is.na(alpha1)] <- 0.5
+  # alpha2[is.na(alpha2)] <- 0.5
+
+# M step
+  #divided by the sum of the diagonal matrix
+  theta<-sum(alpha1)/length(x)
+  theta_c<-sum(alpha2)/length(x)
+
+  mu1<-sum(alpha1*x)/sum(alpha1)
+  mu2<-sum(alpha2*x)/sum(alpha2)
+
+  sigma1<-sum(alpha1*(x-mu1)^2)/sum(alpha1)
+  sigma2<-sum(alpha2*(x-mu2)^2)/sum(alpha2)
+
+  
+  #create a function to do this log like
+  #temp, dont store them all
+   loglik[k]<-sum(alpha1*(log(theta)+log(dnorm(x,mu1,sigma1))))+sum(alpha2*(log(theta_c)+log(dnorm(x,mu2,sigma2))))
+  loglik[k+1]<-sum(alpha1*(log(theta)+logdnorm(x,mu1,sigma1)))+sum(alpha2*(log(theta_c)+logdnorm(x,mu2,sigma2)))
+  k<-k+1
+}
+```
+
+
+```{r}
+# compare
+library(mixtools)
+gm<-normalmixEM(x,k=2,lambda=c(0.5,0.5),mu=c(-0.01,0.01),sigma=c(0.01,0.02))
+gm$lambda
+	gm$mu
+gm$sigma
+
+gm$loglik
+```
+```{r}
+require("stats4");
+
+## sample data from Do and Batzoglou
+ds<-data.frame(heads=c(5,9,8,4,7),n=c(10,10,10,10,10),
+    coin=c("B","A","A","B","A"),weight_A=1:5*0)
+
+## "baby likelihood" for a single observation
+llf <- function(heads, n, theta) {
+  comb <- function(n, x) { #nCr function
+    return(factorial(n) / (factorial(x) * factorial(n-x)))
+  }
+  if (theta<0 || theta >1) { # probabilities should be in [0,1]
+    return(-Inf);
+  }
+  z<-comb(n,heads)* theta^heads * (1-theta)^(n-heads);
+  return (log(z))
+}
+
+## the "E-M" likelihood function
+em <- function(theta_A,theta_B) {
+  # expectation step: given current parameters, what is the likelihood
+  # an observation is the result of tossing coin A (vs coin B)?
+  ds$weight_A <<- by(ds, 1:nrow(ds), function(row) {
+        llf_A <- llf(row$heads,row$n, theta_A);
+        llf_B <- llf(row$heads,row$n, theta_B);
+
+    return(exp(llf_A)/(exp(llf_A)+exp(llf_B)));
+  })
+
+  # maximisation step: given params and weights, calculate likelihood of the sample
+  return(- sum(by(ds, 1:nrow(ds), function(row) {
+    llf_A <- llf(row$heads,row$n, theta_A);
+    llf_B <- llf(row$heads,row$n, theta_B);
+
+    return(row$weight_A*llf_A + (1-row$weight_A)*llf_B);
+  })))
+}
+
+est<-mle(em,start = list(theta_A=0.6,theta_B=0.5), nobs=NROW(ds))
+```
+
+
